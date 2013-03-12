@@ -84,6 +84,7 @@ var JSHINT = (function () {
 			esnext      : true, // if es.next specific syntax should be allowed
 			evil        : true, // if eval should be allowed
 			expr        : true, // if ExpressionStatement should be allowed as Programs
+			forceindent : true, // force strict indentation
 			forin       : true, // if for in statements must filter
 			funcscope   : true, // if only function scope should be used for scope tests
 			gcl         : true, // if JSHint should be compatible with Google Closure Linter
@@ -1541,8 +1542,10 @@ var JSHINT = (function () {
 			line = state.tokens.curr.line;
 			if (state.tokens.next.id !== "}") {
 				indent += state.option.indent;
-				while (!ordinary && state.tokens.next.from > indent) {
-					indent += state.option.indent;
+				if (!state.option.forceindent && !ordinary) {
+					while (state.tokens.next.from > indent) {
+						indent += state.option.indent;
+					}
 				}
 
 				if (isfunc) {
@@ -1574,6 +1577,9 @@ var JSHINT = (function () {
 					indentation();
 				}
 			} else if (line !== state.tokens.next.line) {
+				if (state.option.forceindent) {
+					indent = old_indent;
+				}
 				indentation();
 			}
 			advance("}", t);
@@ -2068,7 +2074,16 @@ var JSHINT = (function () {
 		}
 
 		if (state.tokens.next.id !== ")") {
+			var b = false, oline = state.tokens.curr.line;
 			for (;;) {
+				if (state.option.forceindent &&
+						state.tokens.curr.line !== state.tokens.next.line) {
+					if (!b && state.tokens.next.line === oline + 1) {
+						indent += state.option.indent;
+						b = true;
+					}
+					indentation();
+				}
 				p[p.length] = expression(10);
 				n += 1;
 				if (state.tokens.next.id !== ",") {
@@ -2076,6 +2091,13 @@ var JSHINT = (function () {
 				}
 				comma();
 			}
+			if (b) {
+				indent -= state.option.indent;
+			}
+		}
+		if (state.option.forceindent &&
+				state.tokens.curr.line !== state.tokens.next.line) {
+			indentation();
 		}
 
 		advance(")");
@@ -2255,13 +2277,21 @@ var JSHINT = (function () {
 			return;
 		}
 
+		indent += state.option.indent;
 		for (;;) {
+			if (state.option.forceindent && state.tokens.curr.line !== next.line) {
+				indentation();
+			}
 			ident = identifier(true);
 			params.push(ident);
 			addlabel(ident, "unused");
 			if (state.tokens.next.id === ",") {
 				comma();
 			} else {
+				indent -= state.option.indent;
+				if (state.option.forceindent && state.tokens.curr.line !== next.line) {
+					indentation();
+				}
 				advance(")", next);
 				nospace(state.tokens.prev, state.tokens.curr);
 				return params;
@@ -2585,7 +2615,7 @@ var JSHINT = (function () {
 	var varstatement = stmt("var", function (prefix) {
 		// JavaScript does not have block scope. It only has function scope. So,
 		// declaring a variable in a block can have unexpected consequences.
-		var id, name, value;
+		var id, name, value, old_indent = indent, vfrom = state.tokens.curr.from;
 
 		if (funct["(onevar)"] && state.option.onevar) {
 			warning("W081");
@@ -2597,6 +2627,15 @@ var JSHINT = (function () {
 
 		for (;;) {
 			nonadjacent(state.tokens.curr, state.tokens.next);
+			indent = old_indent;
+			if (state.option.forceindent &&
+					state.tokens.curr.line !== state.tokens.next.line) {
+				if (state.tokens.next.from === vfrom + state.option.indent ||
+						state.tokens.next.from === vfrom + 4) {
+					indent = state.tokens.next.from + old_indent - vfrom;
+				}
+				indentation();
+			}
 			id = identifier();
 
 			if (state.option.esnext && funct[id] === "const") {
@@ -2620,6 +2659,12 @@ var JSHINT = (function () {
 				nonadjacent(state.tokens.curr, state.tokens.next);
 				advance("=");
 				nonadjacent(state.tokens.curr, state.tokens.next);
+				var b = state.option.forceindent &&
+					state.tokens.curr.line !== state.tokens.next.line;
+				if (b) {
+					indent += state.option.indent;
+					indentation();
+				}
 				if (state.tokens.next.id === "undefined") {
 					warning("W080", state.tokens.curr, id);
 				}
@@ -2628,6 +2673,9 @@ var JSHINT = (function () {
 				}
 				value = expression(0);
 				name.first = value;
+				if (b) {
+					indent -= state.option.indent;
+				}
 			}
 			if (state.tokens.next.id !== ",") {
 				break;
@@ -2817,6 +2865,7 @@ var JSHINT = (function () {
 		advance("{");
 		nonadjacent(state.tokens.curr, state.tokens.next);
 		indent += state.option.indent;
+		indent += state.option.indent;
 		this.cases = [];
 
 		for (;;) {
@@ -2868,6 +2917,7 @@ var JSHINT = (function () {
 				advance(":");
 				break;
 			case "}":
+				indent -= state.option.indent;
 				indent -= state.option.indent;
 				indentation();
 				advance("}", t);
