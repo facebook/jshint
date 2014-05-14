@@ -1,3 +1,10 @@
+Archived Repo
+=============
+**This is an archived fork and is no longer supported or updated by 
+Facebook. Please do not file issues or pull-requests against this repo. 
+The primary on-going source of the project may now be found at 
+https://github.com/jshint/jshint**
+
 JSHint, A Static Code Analysis Tool for JavaScript
 ==================================================
 [![Build Status](https://travis-ci.org/jshint/jshint.png?branch=master)](https://travis-ci.org/jshint/jshint)
